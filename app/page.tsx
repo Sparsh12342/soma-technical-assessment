@@ -1,102 +1,128 @@
-"use client"
-import { Todo } from '@prisma/client';
-import { useState, useEffect } from 'react';
+"use client";
 
-export default function Home() {
-  const [newTodo, setNewTodo] = useState('');
-  const [todos, setTodos] = useState([]);
+import { useState } from "react";
+import useSWR from "swr";
+import Image from "next/image";
 
-  useEffect(() => {
-    fetchTodos();
-  }, []);
+type Task = {
+  id: number;
+  title: string;
+  description: string | null;
+  done: boolean;
+  dueDate: string | null;   // ISO from API
+  imageUrl: string | null;
+};
 
-  const fetchTodos = async () => {
-    try {
-      const res = await fetch('/api/todos');
-      const data = await res.json();
-      setTodos(data);
-    } catch (error) {
-      console.error('Failed to fetch todos:', error);
+const fetcher = (u: string) => fetch(u).then(r => r.json());
+
+function isOverdue(iso?: string | null) {
+  if (!iso) return false;
+  return new Date(iso).getTime() < Date.now();
+}
+
+export default function Page() {
+  const { data, mutate, isLoading } = useSWR<{ tasks: Task[] }>("/api/tasks", fetcher);
+  const [title, setTitle] = useState("");
+  const [desc, setDesc] = useState("");
+  const [due, setDue] = useState(""); // yyyy-MM-ddTHH:mm
+
+  async function createTask() {
+    const res = await fetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, description: desc, dueDate: due || null }),
+    });
+    if (res.ok) {
+      setTitle(""); setDesc(""); setDue("");
+      mutate();
+    } else {
+      const j = await res.json().catch(()=>({error:""}));
+      alert(j.error || "Failed to create task");
     }
-  };
+  }
 
-  const handleAddTodo = async () => {
-    if (!newTodo.trim()) return;
-    try {
-      await fetch('/api/todos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newTodo }),
-      });
-      setNewTodo('');
-      fetchTodos();
-    } catch (error) {
-      console.error('Failed to add todo:', error);
-    }
-  };
-
-  const handleDeleteTodo = async (id:any) => {
-    try {
-      await fetch(`/api/todos/${id}`, {
-        method: 'DELETE',
-      });
-      fetchTodos();
-    } catch (error) {
-      console.error('Failed to delete todo:', error);
-    }
-  };
+  async function toggleDone(id: number, done: boolean) {
+    const res = await fetch(`/api/tasks/${id}/done`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ done }),
+    });
+    if (res.ok) mutate();
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-500 to-red-500 flex flex-col items-center p-4">
-      <div className="w-full max-w-md">
-        <h1 className="text-4xl font-bold text-center text-white mb-8">Things To Do App</h1>
-        <div className="flex mb-6">
-          <input
-            type="text"
-            className="flex-grow p-3 rounded-l-full focus:outline-none text-gray-700"
-            placeholder="Add a new todo"
-            value={newTodo}
-            onChange={(e) => setNewTodo(e.target.value)}
-          
-          />
-          <input type="date" />
-          <button
-            onClick={handleAddTodo}
-            className="bg-white text-indigo-600 p-3 rounded-r-full hover:bg-gray-100 transition duration-300"
-          >
-            Add
-          </button>
-        </div>
-        <ul>
-          {todos.map((todo:Todo) => (
-            <li
-              key={todo.id}
-              className="flex justify-between items-center bg-white bg-opacity-90 p-4 mb-4 rounded-lg shadow-lg"
-            >
-              <span className="text-gray-800">{todo.title}</span>
-              <button
-                onClick={() => handleDeleteTodo(todo.id)}
-                className="text-red-500 hover:text-red-700 transition duration-300"
-              >
-                {/* Delete Icon */}
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
+    <main className="p-6 max-w-3xl mx-auto space-y-6">
+      {/* Create form */}
+      <form
+        onSubmit={e => { e.preventDefault(); createTask(); }}
+        className="flex flex-col gap-2 border rounded p-3"
+      >
+        <input
+          className="border rounded p-2"
+          placeholder="Task title"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          required
+        />
+        <textarea
+          className="border rounded p-2"
+          placeholder="Description (optional)"
+          value={desc}
+          onChange={e => setDesc(e.target.value)}
+        />
+        <label className="text-sm">Due date</label>
+        <input
+          type="datetime-local"
+          className="border rounded p-2"
+          value={due}
+          onChange={e => setDue(e.target.value)}
+        />
+        <button className="bg-black text-white rounded p-2">Add task</button>
+      </form>
+
+      {/* Task list */}
+      {isLoading ? (
+        <div>Loading tasks…</div>
+      ) : (
+        <ul className="space-y-3">
+          {data?.tasks?.map(t => (
+            <li key={t.id} className="border rounded p-3 flex gap-3">
+              <input
+                type="checkbox"
+                checked={t.done}
+                onChange={e => toggleDone(t.id, e.target.checked)}
+              />
+              <div className="flex-1">
+                <div className="font-medium">{t.title}</div>
+                {t.description && (
+                  <div className="text-sm text-gray-600">{t.description}</div>
+                )}
+
+                {t.dueDate && (
+                  <div className={`text-sm ${isOverdue(t.dueDate) ? "text-red-600 font-semibold" : "text-gray-600"}`}>
+                    Due: {new Date(t.dueDate).toLocaleString()}
+                  </div>
+                )}
+
+                <div className="mt-2">
+                  {!t.imageUrl ? (
+                    <div className="animate-pulse h-32 w-full bg-gray-100 rounded" />
+                  ) : (
+                    <Image
+                      src={t.imageUrl}
+                      alt={t.title}
+                      width={640}
+                      height={360}
+                      className="rounded"
+                    />
+                  )}
+                </div>
+              </div>
             </li>
           ))}
         </ul>
-      </div>
-    </div>
+      )}
+    </main>
   );
 }
+
