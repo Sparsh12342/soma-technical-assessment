@@ -1,14 +1,28 @@
-generator client {
-  provider = "prisma-client-js"
+model Task {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  done        Boolean   @default(false)
+
+  // NEW
+  dueDate     DateTime?
+  imageUrl    String?
+
+  // Edges in the dependency graph
+  dependenciesFrom TaskDependency[] @relation("FromTask") // this task depends on others (outgoing edges)
+  dependenciesTo   TaskDependency[] @relation("ToTask")   // other tasks depend on this (incoming edges)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
-datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
-}
+model TaskDependency {
+  id     Int  @id @default(autoincrement())
+  fromId Int
+  toId   Int
 
-model Todo {
-  id        Int      @id @default(autoincrement())
-  title     String
-  createdAt DateTime  @default(now())
+  from   Task @relation("FromTask", fields: [fromId], references: [id])
+  to     Task @relation("ToTask",   fields: [toId],   references: [id])
+
+  @@unique([fromId, toId])
 }
