@@ -1,32 +1,32 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { fetchPexelsImage } from "@/lib/pexels";
 
 export async function GET() {
-  try {
-    const todos = await prisma.todo.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-    return NextResponse.json(todos);
-  } catch (error) {
-    return NextResponse.json({ error: 'Error fetching todos' }, { status: 500 });
-  }
+  const tasks = await prisma.task.findMany({ orderBy: { id: "asc" } });
+  return NextResponse.json({ tasks });
 }
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const { title } = await request.json();
-    if (!title || title.trim() === '') {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
+    const body = await req.json();
+    const title: string = body?.title;
+    const description: string | null = body?.description ?? null;
+    const dueDateISO: string | null = body?.dueDate ?? null;
+
+    if (!title?.trim()) {
+      return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
-    const todo = await prisma.todo.create({
-      data: {
-        title,
-      },
+
+    const imageUrl = await fetchPexelsImage(title);
+    const dueDate = dueDateISO ? new Date(dueDateISO) : null;
+
+    const task = await prisma.task.create({
+      data: { title, description, imageUrl, dueDate },
     });
-    return NextResponse.json(todo, { status: 201 });
-  } catch (error) {
-    return NextResponse.json({ error: 'Error creating todo' }, { status: 500 });
+
+    return NextResponse.json({ task }, { status: 201 });
+  } catch (e) {
+    return NextResponse.json({ error: "Failed to create task" }, { status: 500 });
   }
 }
