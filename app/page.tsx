@@ -1,3 +1,4 @@
+// app/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import Image from "next/image";
@@ -14,32 +15,47 @@ export default function Home() {
   const [due, setDue] = useState(""); // yyyy-MM-dd from <input type="date">
   const [todos, setTodos] = useState<Todo[]>([]);
 
-  useEffect(() => { fetchTodos(); }, []);
+  useEffect(() => {
+    fetchTodos();
+  }, []);
 
   async function fetchTodos() {
-    const res = await fetch("/api/todos");
-    const data = await res.json();
-    setTodos(data);
+    try {
+      const res = await fetch("/api/todos");
+      const data = await res.json();
+      setTodos(data);
+    } catch (error) {
+      console.error("Failed to fetch todos:", error);
+    }
   }
 
   async function handleAddTodo() {
     if (!newTodo.trim()) return;
-    await fetch("/api/todos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: newTodo,
-        dueDate: due ? new Date(due).toISOString() : null, // send ISO if picked
-      }),
-    });
-    setNewTodo("");
-    setDue("");
-    fetchTodos();
+    try {
+      await fetch("/api/todos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newTodo,
+          // send ISO if date picked (midnight local is fine)
+          dueDate: due ? new Date(due).toISOString() : null,
+        }),
+      });
+      setNewTodo("");
+      setDue("");
+      fetchTodos();
+    } catch (error) {
+      console.error("Failed to add todo:", error);
+    }
   }
 
   async function handleDeleteTodo(id: number) {
-    await fetch(`/api/todos/${id}`, { method: "DELETE" });
-    fetchTodos();
+    try {
+      await fetch(`/api/todos/${id}`, { method: "DELETE" });
+      fetchTodos();
+    } catch (error) {
+      console.error("Failed to delete todo:", error);
+    }
   }
 
   const isOverdue = (iso?: string | null) =>
@@ -74,44 +90,45 @@ export default function Home() {
 
         <ul>
           {todos.map((todo) => (
-            <li key={todo.id} className="bg-white bg-opacity-90 p-4 mb-4 rounded-lg shadow-lg">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <span className="text-gray-800 block font-medium">{todo.title}</span>
+            <li
+              key={todo.id}
+              className="flex justify-between items-start bg-white bg-opacity-90 p-4 mb-4 rounded-lg shadow-lg"
+            >
+              <div className="flex-1">
+                <span className="text-gray-800 block font-medium">{todo.title}</span>
 
-                  {todo.dueDate && (
-                    <span
-                      className={`text-sm block mt-1 ${
-                        isOverdue(todo.dueDate) ? "text-red-600 font-semibold" : "text-gray-600"
-                      }`}
-                    >
-                      Due: {new Date(todo.dueDate).toLocaleString()}
-                    </span>
+                {todo.dueDate && (
+                  <span
+                    className={`text-sm block mt-1 ${
+                      isOverdue(todo.dueDate) ? "text-red-600 font-semibold" : "text-gray-600"
+                    }`}
+                  >
+                    Due: {new Date(todo.dueDate).toLocaleString()}
+                  </span>
+                )}
+
+                <div className="mt-3">
+                  {!todo.imageUrl ? (
+                    <div className="animate-pulse h-32 w-full bg-gray-100 rounded" />
+                  ) : (
+                    <Image
+                      src={todo.imageUrl}
+                      alt={todo.title}
+                      width={640}
+                      height={360}
+                      className="rounded"
+                    />
                   )}
-
-                  <div className="mt-3">
-                    {!todo.imageUrl ? (
-                      <div className="animate-pulse h-32 w-full bg-gray-100 rounded" />
-                    ) : (
-                      <Image
-                        src={todo.imageUrl}
-                        alt={todo.title}
-                        width={640}
-                        height={360}
-                        className="rounded"
-                      />
-                    )}
-                  </div>
                 </div>
-
-                <button
-                  onClick={() => handleDeleteTodo(todo.id)}
-                  className="text-red-500 hover:text-red-700 transition duration-300 ml-3"
-                  title="Delete"
-                >
-                  ✕
-                </button>
               </div>
+
+              <button
+                onClick={() => handleDeleteTodo(todo.id)}
+                className="text-red-500 hover:text-red-700 transition duration-300 ml-3"
+                title="Delete"
+              >
+                ✕
+              </button>
             </li>
           ))}
         </ul>
@@ -119,5 +136,4 @@ export default function Home() {
     </div>
   );
 }
-
 
