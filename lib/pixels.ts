@@ -1,3 +1,4 @@
+// lib/pexels.ts
 export async function fetchPexelsImage(query: string): Promise<string | null> {
   const key = process.env.PEXELS_API_KEY;
   if (!key || !query?.trim()) return null;
