@@ -26,3 +26,14 @@ model TaskDependency {
 
   @@unique([fromId, toId])
 }
+model Todo {
+  id        Int      @id @default(autoincrement())
+  title     String
+  // NEW:
+  dueDate   DateTime?
+  imageUrl  String?
+
+  createdAt DateTime @default(now())
+  // ...whatever else was already here
+}
+
