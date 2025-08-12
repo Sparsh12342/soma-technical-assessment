@@ -1,3 +1,13 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
 model Task {
   id          Int       @id @default(autoincrement())
   title       String
@@ -8,9 +18,9 @@ model Task {
   dueDate     DateTime?
   imageUrl    String?
 
-  // Edges in the dependency graph
-  dependenciesFrom TaskDependency[] @relation("FromTask") // this task depends on others (outgoing edges)
-  dependenciesTo   TaskDependency[] @relation("ToTask")   // other tasks depend on this (incoming edges)
+  // Edges in the dependency graph (for Part 3 — ok to leave unused for now)
+  dependenciesFrom TaskDependency[] @relation("FromTask")
+  dependenciesTo   TaskDependency[] @relation("ToTask")
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -26,6 +36,7 @@ model TaskDependency {
 
   @@unique([fromId, toId])
 }
+
 model Todo {
   id        Int      @id @default(autoincrement())
   title     String
@@ -34,6 +45,4 @@ model Todo {
   imageUrl  String?
 
   createdAt DateTime @default(now())
-  // ...whatever else was already here
 }
-
