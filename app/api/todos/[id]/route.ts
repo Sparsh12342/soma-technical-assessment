@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  const { done } = await req.json();
-  const id = Number(params.id);
-  await prisma.task.update({ where: { id }, data: { done: !!done } });
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  await prisma.todo.delete({ where: { id: Number(params.id) } });
   return NextResponse.json({ ok: true });
 }
