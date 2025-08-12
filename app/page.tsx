@@ -1,128 +1,123 @@
 "use client";
-
-import { useState } from "react";
-import useSWR from "swr";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 
-type Task = {
+type Todo = {
   id: number;
   title: string;
-  description: string | null;
-  done: boolean;
-  dueDate: string | null;   // ISO from API
-  imageUrl: string | null;
+  dueDate?: string | null;
+  imageUrl?: string | null;
 };
 
-const fetcher = (u: string) => fetch(u).then(r => r.json());
+export default function Home() {
+  const [newTodo, setNewTodo] = useState("");
+  const [due, setDue] = useState(""); // yyyy-MM-dd from <input type="date">
+  const [todos, setTodos] = useState<Todo[]>([]);
 
-function isOverdue(iso?: string | null) {
-  if (!iso) return false;
-  return new Date(iso).getTime() < Date.now();
-}
+  useEffect(() => { fetchTodos(); }, []);
 
-export default function Page() {
-  const { data, mutate, isLoading } = useSWR<{ tasks: Task[] }>("/api/tasks", fetcher);
-  const [title, setTitle] = useState("");
-  const [desc, setDesc] = useState("");
-  const [due, setDue] = useState(""); // yyyy-MM-ddTHH:mm
+  async function fetchTodos() {
+    const res = await fetch("/api/todos");
+    const data = await res.json();
+    setTodos(data);
+  }
 
-  async function createTask() {
-    const res = await fetch("/api/tasks", {
+  async function handleAddTodo() {
+    if (!newTodo.trim()) return;
+    await fetch("/api/todos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description: desc, dueDate: due || null }),
+      body: JSON.stringify({
+        title: newTodo,
+        dueDate: due ? new Date(due).toISOString() : null, // send ISO if picked
+      }),
     });
-    if (res.ok) {
-      setTitle(""); setDesc(""); setDue("");
-      mutate();
-    } else {
-      const j = await res.json().catch(()=>({error:""}));
-      alert(j.error || "Failed to create task");
-    }
+    setNewTodo("");
+    setDue("");
+    fetchTodos();
   }
 
-  async function toggleDone(id: number, done: boolean) {
-    const res = await fetch(`/api/tasks/${id}/done`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done }),
-    });
-    if (res.ok) mutate();
+  async function handleDeleteTodo(id: number) {
+    await fetch(`/api/todos/${id}`, { method: "DELETE" });
+    fetchTodos();
   }
+
+  const isOverdue = (iso?: string | null) =>
+    iso ? new Date(iso).getTime() < Date.now() : false;
 
   return (
-    <main className="p-6 max-w-3xl mx-auto space-y-6">
-      {/* Create form */}
-      <form
-        onSubmit={e => { e.preventDefault(); createTask(); }}
-        className="flex flex-col gap-2 border rounded p-3"
-      >
-        <input
-          className="border rounded p-2"
-          placeholder="Task title"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          required
-        />
-        <textarea
-          className="border rounded p-2"
-          placeholder="Description (optional)"
-          value={desc}
-          onChange={e => setDesc(e.target.value)}
-        />
-        <label className="text-sm">Due date</label>
-        <input
-          type="datetime-local"
-          className="border rounded p-2"
-          value={due}
-          onChange={e => setDue(e.target.value)}
-        />
-        <button className="bg-black text-white rounded p-2">Add task</button>
-      </form>
+    <div className="min-h-screen bg-gradient-to-b from-orange-500 to-red-500 flex flex-col items-center p-4">
+      <div className="w-full max-w-md">
+        <h1 className="text-4xl font-bold text-center text-white mb-8">Things To Do App</h1>
 
-      {/* Task list */}
-      {isLoading ? (
-        <div>Loading tasks…</div>
-      ) : (
-        <ul className="space-y-3">
-          {data?.tasks?.map(t => (
-            <li key={t.id} className="border rounded p-3 flex gap-3">
-              <input
-                type="checkbox"
-                checked={t.done}
-                onChange={e => toggleDone(t.id, e.target.checked)}
-              />
-              <div className="flex-1">
-                <div className="font-medium">{t.title}</div>
-                {t.description && (
-                  <div className="text-sm text-gray-600">{t.description}</div>
-                )}
+        <div className="flex mb-6 gap-2">
+          <input
+            type="text"
+            className="flex-grow p-3 rounded-l-full focus:outline-none text-gray-700"
+            placeholder="Add a new todo"
+            value={newTodo}
+            onChange={(e) => setNewTodo(e.target.value)}
+          />
+          <input
+            type="date"
+            className="p-3 rounded-md"
+            value={due}
+            onChange={(e) => setDue(e.target.value)}
+          />
+          <button
+            onClick={handleAddTodo}
+            className="bg-white text-indigo-600 p-3 rounded-r-full hover:bg-gray-100 transition duration-300"
+          >
+            Add
+          </button>
+        </div>
 
-                {t.dueDate && (
-                  <div className={`text-sm ${isOverdue(t.dueDate) ? "text-red-600 font-semibold" : "text-gray-600"}`}>
-                    Due: {new Date(t.dueDate).toLocaleString()}
-                  </div>
-                )}
+        <ul>
+          {todos.map((todo) => (
+            <li key={todo.id} className="bg-white bg-opacity-90 p-4 mb-4 rounded-lg shadow-lg">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <span className="text-gray-800 block font-medium">{todo.title}</span>
 
-                <div className="mt-2">
-                  {!t.imageUrl ? (
-                    <div className="animate-pulse h-32 w-full bg-gray-100 rounded" />
-                  ) : (
-                    <Image
-                      src={t.imageUrl}
-                      alt={t.title}
-                      width={640}
-                      height={360}
-                      className="rounded"
-                    />
+                  {todo.dueDate && (
+                    <span
+                      className={`text-sm block mt-1 ${
+                        isOverdue(todo.dueDate) ? "text-red-600 font-semibold" : "text-gray-600"
+                      }`}
+                    >
+                      Due: {new Date(todo.dueDate).toLocaleString()}
+                    </span>
                   )}
+
+                  <div className="mt-3">
+                    {!todo.imageUrl ? (
+                      <div className="animate-pulse h-32 w-full bg-gray-100 rounded" />
+                    ) : (
+                      <Image
+                        src={todo.imageUrl}
+                        alt={todo.title}
+                        width={640}
+                        height={360}
+                        className="rounded"
+                      />
+                    )}
+                  </div>
                 </div>
+
+                <button
+                  onClick={() => handleDeleteTodo(todo.id)}
+                  className="text-red-500 hover:text-red-700 transition duration-300 ml-3"
+                  title="Delete"
+                >
+                  ✕
+                </button>
               </div>
             </li>
           ))}
         </ul>
-      )}
-    </main>
+      </div>
+    </div>
   );
 }
+
 
